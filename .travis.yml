@@ -1,0 +1,11 @@
+sudo: required
+
+services:
+  - docker
+
+install:
+  - docker build -t ishiland/docker-python-geosupport .
+  - docker ps -a
+
+script:
+  - docker run -it ishiland/docker-python-geosupport /bin/sh test.sh
