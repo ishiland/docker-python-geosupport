@@ -1,23 +1,19 @@
 #!/bin/sh
 FROM alpine:3.7
 
-ARG build
-
 # VERSIONS
 ENV ALPINE_VERSION=3.7 \
     PYTHON_VERSION=3.6.5
 
-# GEOFILES and LD_LIBRARY_PATH are not consistent with the defined geosupport_version.
-# In this case, `18.2` is included to the paths of GEOFILES and LD_LIBRARY_PATH. How to resolve this so we can
-# pass in a geosupport_version when building the docker
+# Unable to set GEOFILES and LD_LIBRARY_PATH based on defined geosupport_version. Need additional logic to
+# get the name of the `version-18b_` directory.
 ENV PYTHON_PATH=/usr/lib/python$PYTHON_VERSION \
     PATH="/usr/lib/python$PYTHON_VERSION/bin/:${PATH}" \
     GEOFILES="/geosupport/version-18b_18.2/fls/"\
     LD_LIBRARY_PATH="/geosupport/version-18b_18.2/lib/${LD_LIBRARY_PATH}"\
-    geosupport_version=18b \
-    build=$build
+    geosupport_version=18b
 
-# python dependencies taken from https://github.com/jfloff/alpine-python/blob/master/3.6/Dockerfile
+# The below python dependencies borrowed from https://github.com/jfloff/alpine-python/blob/master/3.6/Dockerfile
 ENV PACKAGES="\
     dumb-init \
     musl \
@@ -29,15 +25,6 @@ ENV PACKAGES="\
     ca-certificates \
 "
 
-# PACKAGES
-#   * dumb-init: a proper init system for containers, to reap zombie children
-#   * musl: standard C library
-#   * lib6-compat: compatibility libraries for glibc
-#   * linux-headers: commonly needed, and an unusual package name from Alpine.
-#   * build-base: used so we include the basic development packages (gcc)
-#   * bash: so we can access /bin/bash
-#   * git: to ease up clones of repos
-#   * ca-certificates: for SSL verification during Pip and easy_install
 ENV PYTHON_BUILD_PACKAGES="\
     readline-dev \
     zlib-dev \
@@ -45,6 +32,7 @@ ENV PYTHON_BUILD_PACKAGES="\
     sqlite-dev \
     libressl-dev \
 "
+
 RUN set -ex ;\
     # find MAJOR and MINOR python versions based on $PYTHON_VERSION
     export PYTHON_MAJOR_VERSION=$(echo "${PYTHON_VERSION}" | rev | cut -d"." -f3-  | rev) ;\
@@ -52,20 +40,14 @@ RUN set -ex ;\
     # replacing default repositories with edge ones
     echo "http://dl-cdn.alpinelinux.org/alpine/v$ALPINE_VERSION/community" >> /etc/apk/repositories ;\
     echo "http://dl-cdn.alpinelinux.org/alpine/v$ALPINE_VERSION/main" >> /etc/apk/repositories ;\
-
     # Add the packages, with a CDN-breakage fallback if needed
     apk add --no-cache $PACKAGES || \
         (sed -i -e 's/dl-cdn/dl-4/g' /etc/apk/repositories && apk add --no-cache $PACKAGES) ;\
     # Add packages just for the python build process with a CDN-breakage fallback if needed
     apk add --no-cache --virtual .build-deps $PYTHON_BUILD_PACKAGES || \
         (sed -i -e 's/dl-cdn/dl-4/g' /etc/apk/repositories && apk add --no-cache --virtual .build-deps $PYTHON_BUILD_PACKAGES) ;\
-
     # turn back the clock -- so hacky!
     echo "http://dl-cdn.alpinelinux.org/alpine/v$ALPINE_VERSION/main/" > /etc/apk/repositories ;\
-    # echo "@community http://dl-cdn.alpinelinux.org/alpine/v$ALPINE_VERSION/community" >> /etc/apk/repositories ;\
-    # echo "@testing http://dl-cdn.alpinelinux.org/alpine/v$ALPINE_VERSION/testing" >> /etc/apk/repositories ;\
-    # echo "@edge-main http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories ;\
-
     # use pyenv to download and compile specific python version
     git clone --depth 1 https://github.com/pyenv/pyenv /usr/lib/pyenv ;\
     PYENV_ROOT=/usr/lib/pyenv /usr/lib/pyenv/bin/pyenv install $PYTHON_VERSION ;\
@@ -85,9 +67,7 @@ RUN set -ex ;\
     ln -sf $PYTHON_PATH/bin/python-config $PYTHON_PATH/bin/python$PYTHON_MAJOR_VERSION-config ;\
     ln -sf $PYTHON_PATH/bin/python-config $PYTHON_PATH/bin/python$PYTHON_MINOR_VERSION-config ;\
     # delete files to to reduce container size
-    # tips taken from main python docker repo
     find /usr/lib/python$PYTHON_VERSION -depth \( -name '*.pyo' -o -name '*.pyc' -o -name 'test' -o -name 'tests' \) -exec rm -rf '{}' + ;\
-
     # remove build dependencies and any leftover apk cache
     apk del --no-cache --purge .build-deps ;\
     rm -rf /var/cache/apk/*
@@ -100,13 +80,9 @@ RUN apk update \
   && unzip gdelx_$geosupport_version.zip -d geosupport \
   && rm gdelx_$geosupport_version.zip
 
-
 RUN pip install python-geosupport
-# Run test on python-geosupport if build_env == test
-#ADD ./config/install-lib.sh install-lib.sh
 
 ADD ./test.sh test.sh
-#RUN bash install-lib.sh
 
 # Define default command.
 CMD ["/bin/sh"]
