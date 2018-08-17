@@ -3,7 +3,7 @@ Spin up a Docker container to geocode NYC addresses fast and securely using [pyt
 
 ## What do I need?
  - [Docker](https://docs.docker.com/install/). If you never used Docker before, you may want to take a few minutes to get [familiar](https://docs.docker.com/get-started/) with it. 
- - Local storage. At the time of this writing the built docker image takes up 2.2 GB.
+ - Local storage. At the time of this writing the built docker container takes up 2.2 GB.
 
 ## Build the container
 ```shell
